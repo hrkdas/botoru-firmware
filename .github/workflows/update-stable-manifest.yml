@@ -78,28 +78,17 @@ jobs:
               raise SystemExit('Release tag is missing in event payload')
 
           semver_re = re.compile(r'^(?P<variant>boturo_[a-z0-9_]+)-v?(?P<version>\d+\.\d+\.\d+)$')
-          legacy_re = re.compile(r'^v?(?P<version>\d+\.\d+\.\d+)$')
           asset_re = re.compile(
-              r'^firmware(?:_(?P<variant>boturo_[a-z0-9_]+))?_v?(?P<version>\d+\.\d+\.\d+)\.bin$'
+              r'^firmware_(?P<variant>boturo_[a-z0-9_]+)_v?(?P<version>\d+\.\d+\.\d+)\.bin$'
           )
 
-          tag_variant = None
-          tag_version = None
           match = semver_re.match(tag)
-          if match:
-              tag_variant = match.group('variant')
-              tag_version = match.group('version')
-          else:
-              match = legacy_re.match(tag)
-              if match:
-                  tag_variant = 'boturo_cue'
-                  tag_version = match.group('version')
-
-          if tag_variant is None or tag_version is None:
+          if match is None:
               raise SystemExit(
-                  'Unsupported release tag format. Use boturo_<variant>-vX.Y.Z '
-                  'or legacy vX.Y.Z for transitional Cue releases.'
+                  'Unsupported release tag format. Use boturo_<variant>-vX.Y.Z.'
               )
+          tag_variant = match.group('variant')
+          tag_version = match.group('version')
 
           github_env = os.environ.get('GITHUB_ENV')
           if github_env:
@@ -118,7 +107,7 @@ jobs:
               asset_match = asset_re.match(asset_name)
               if asset_match is None:
                   continue
-              asset_variant = asset_match.group('variant') or 'boturo_cue'
+              asset_variant = asset_match.group('variant')
               asset_version = asset_match.group('version')
               if asset_variant == tag_variant and asset_version == tag_version:
                   exact_matches.append(asset)
@@ -145,10 +134,10 @@ jobs:
           if asset_match is None:
               raise SystemExit(
                   'Selected .bin asset name does not match expected pattern '
-                  'firmware_<variant>_vX.Y.Z.bin or legacy firmware_vX.Y.Z.bin'
+                  'firmware_<variant>_vX.Y.Z.bin'
               )
 
-          asset_variant = asset_match.group('variant') or 'boturo_cue'
+          asset_variant = asset_match.group('variant')
           asset_version = asset_match.group('version')
           if asset_variant != tag_variant or asset_version != tag_version:
               raise SystemExit(
@@ -188,7 +177,6 @@ jobs:
           import json
           import os
           import pathlib
-          import shutil
 
           event_path = os.environ['GITHUB_EVENT_PATH']
           with open(event_path, 'r', encoding='utf-8') as fh:
@@ -236,10 +224,6 @@ jobs:
           )
           print(f'Variant manifest updated: {variant_manifest_path}')
 
-          if variant_key == 'boturo_cue':
-              legacy_manifest_path = manifest_root / 'stable.json'
-              shutil.copyfile(variant_manifest_path, legacy_manifest_path)
-              print(f'Legacy Cue manifest updated: {legacy_manifest_path}')
           PY
 
       - name: Commit manifest changes if needed
